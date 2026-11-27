@@ -279,6 +279,20 @@ if (!date && /pasado mañana/.test(lower)) {
 } else if (!date && /hoy/.test(lower)) {
   date = TODAY;
 }
+                          
+let time='';
+
+let tm=txt.match(/(?:a\s*las?\s*)?(\d{1,2})(?::([0-5]\d))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i)||txt.match(/(?:hora\s*)?(\d{1,2}):([0-5]\d)/i);
+
+if(tm){
+  let h=Number(tm[1]),mi=tm[2]||'00';
+
+  if(tm[3]&&/p/i.test(tm[3])&&h<12)h+=12;
+  if(tm[3]&&/a/i.test(tm[3])&&h===12)h=0;
+
+  if(h<24)time=String(h).padStart(2,'0')+':'+mi;
+}
+
 
 let duration='';let durM=txt.match(/(\d{1,4})\s*(?:minutos|min|hrs?|horas?)/i);if(durM){const n=Number(durM[1]);duration=/hora|hr/i.test(durM[0])?n*60:n}let passengers='';let pm=txt.match(/(\d+)\s*(personas|pasajeros|pasajero|clientes)/i);if(pm)passengers=pm[1];let driver=state.drivers.find(d=>lower.includes(d.toLowerCase()))||'';let vehicle=state.vehicles.find(v=>lower.includes(v.name.toLowerCase()))?.name||'';let pickup='';let p=txt.match(/(?:recoger|recogida|recogemos)\s+(?:(?:\d+)\s+(?:pasajeros|personas)\s+)?(?:en\s+)?([^,.;]+)/i)||txt.match(/desde\s+([^,.;]+)/i);if(p)pickup=p[1].replace(/[.,]$/,'').trim();let dest='';let destM=txt.match(/(?:destino|hacia|hasta)\s+(.+?)(?=\s+(?:con|a las|el día|para|$))/i);if(destM)dest=destM[1].replace(/[.,]$/,'').trim();let service=/boda|wedding/.test(lower)?'Traslado de boda':/tour|turístic/.test(lower)?'Tour turístico':/corporativ|empresa/.test(lower)?'Traslado corporativo':/evento/.test(lower)?'Traslado de evento':'';let missing=[];if(!date)missing.push('fecha');if(!time)missing.push('hora');if(!pickup)missing.push('punto de recogida');if(!passengers)missing.push('número de pasajeros');analysisDraft={operation,date,time,durationMinutes:duration,passengers,pickup,destination:dest,type:service,driver,vehicle,customer:'',missing};$('analysisEmpty').style.display='none';$('analysisForm').style.display='block';$('operationBadge').textContent=operation.replaceAll('_',' ');$('confidenceBadge').textContent='Extracción de muestra · reglas locales';$('aiDate').value=date;$('aiTime').value=time;$('aiDuration').value=duration;$('aiType').value=service;$('aiPassengers').value=passengers;$('aiPickup').value=pickup;$('aiDestination').value=dest;$('aiCustomer').value='';renderSelects();$('aiDriver').value=driver;$('aiVehicle').value=vehicle;const targetWrap=$('targetReservationWrap');const needsTarget=operation==='MODIFICACION'||operation==='CANCELACION'||operation==='CONSULTA';targetWrap.style.display=needsTarget?'block':'none';const available=state.reservations.filter(r=>r.status!=='CANCELADA');$('aiTargetReservation').innerHTML='<option value="">Selecciona la reserva</option>'+available.map(r=>`<option value="${escapeHTML(r.id)}">${escapeHTML(r.id)} · ${fmtDate(r.date)} · ${escapeHTML(r.time)} · ${escapeHTML(r.customer||r.type||'Servicio')}</option>`).join('');const ref=txt.match(/RSM-[A-Z0-9-]+/i);if(ref&&available.some(r=>r.id.toLowerCase()===ref[0].toLowerCase()))$('aiTargetReservation').value=available.find(r=>r.id.toLowerCase()===ref[0].toLowerCase()).id;$('aiSaveBtn').textContent=operation==='CANCELACION'?'Registrar cancelación':operation==='MODIFICACION'?'Aplicar modificación':operation==='CONSULTA'?'Consultar reserva':'Guardar como pendiente de revisión';$('aiWarnings').style.display=(missing.length||needsTarget)?'block':'none';$('aiWarnings').textContent=(missing.length?'Información faltante para revisar: '+missing.join(', ')+'. ':'')+(needsTarget?'Selecciona la reserva existente correcta. No se modificará ni cancelará ningún registro sin esa selección.':'Revisa la información extraída y confirma que coincida con el mensaje original.');toast('Análisis demostrativo completado')}
 function clearAnalysis(){$('analysisForm').style.display='none';$('analysisEmpty').style.display='block';analysisDraft=null}
