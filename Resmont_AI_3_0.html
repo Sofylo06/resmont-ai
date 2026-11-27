@@ -206,8 +206,80 @@ function saveReservation(){const id=$('editId').value;const data={date:$('formDa
 function validDate(s){const d=new Date(s+'T00:00:00');return !Number.isNaN(d.getTime())&&iso(d)===s}function validTime(s){return /^([01]\d|2[0-3]):[0-5]\d$/.test(s)}
 function viewReservation(id){const r=state.reservations.find(x=>x.id===id);if(!r)return;$('detailTitle').textContent=r.id;$('detailBody').innerHTML=`<div class="toolbar" style="justify-content:space-between;margin-bottom:14px">${statusBadge(r.status)}<span class="badge blue">${fmtDate(r.date)} · ${escapeHTML(r.time)}</span></div><div class="detail-grid">${[['Servicio',r.type||'Sin especificar'],['Cliente / alias',r.customer||'No registrado'],['Pasajeros',r.passengers||'No registrados'],['Duración',(r.durationMinutes||60)+' minutos'],['Punto de recogida',r.pickup||'No registrado'],['Destino',r.destination||'No registrado'],['Conductor',r.driver||'Sin asignar'],['Vehículo',r.vehicle||'Sin asignar']].map(([k,v])=>`<div class="detail-cell"><small>${k}</small><b>${escapeHTML(v)}</b></div>`).join('')}<div class="detail-cell detail-wide"><small>Observación</small><b>Registro de demostración. Verificar los datos antes de prestar el servicio.</b></div></div>`;$('detailEditBtn').style.display='inline-flex';$('detailEditBtn').onclick=()=>{closeDetail();editReservation(id)};$('detailModal').classList.add('show')}
 function closeDetail(){$('detailModal').classList.remove('show');$('detailEditBtn').style.display='inline-flex'}
-function analyzeMessage(){const txt=$('messageInput').value.trim();if(!txt){toast('Pega un mensaje antes de analizar.');return}const lower=txt.toLowerCase();const operation=/(cancel|anul|no se realiza|suspender)/.test(lower)?'CANCELACION':/(cambi[oa]|cambiar|modific|reprogram|nueva hora|mover|actualiz|ajustar)/.test(lower)?'MODIFICACION':/(consulta|confirmad|quién va|quien va|a qué hora)/.test(lower)?'CONSULTA':'NUEVA_RESERVA';let date='';let dm=txt.match(/(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?/);let isoMatch=txt.match(/(20\d{2})-(\d{2})-(\d{2})/);if(isoMatch)date=isoMatch[0];else if(dm){const year=dm[3]?(dm[3].length===2?'20'+dm[3]:dm[3]):String(new Date().getFullYear());date=`${year}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`;if(!validDate(date))date=''}else if(/pasado mañana/.test(lower)){const d=new Date(TODAY+'T00:00:00');d.setDate(d.getDate()+2);date=iso(d)}else if(/mañana/.test(lower)){const d=new Date(TODAY+'T00:00:00');d.setDate(d.getDate()+1);date=iso(d)}else if(/hoy/.test(lower))date=TODAY;
-let time='';let tm=txt.match(/(?:a\s*las?\s*)?(\d{1,2})(?::([0-5]\d))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)/i)||txt.match(/(?:hora\s*)?(\d{1,2}):([0-5]\d)/i);if(tm){let h=Number(tm[1]),mi=tm[2]||'00';if(tm[3]&&/p/i.test(tm[3])&&h<12)h+=12;if(tm[3]&&/a/i.test(tm[3])&&h===12)h=0;if(h<24)time=String(h).padStart(2,'0')+':'+mi}
+function analyzeMessage(){const txt=$('messageInput').value.trim();if(!txt){toast('Pega un mensaje antes de analizar.');return}const lower=txt.toLowerCase();const operation=/(cancel|anul|no se realiza|suspender)/.test(lower)?'CANCELACION':/(cambi[oa]|cambiar|modific|reprogram|nueva hora|mover|actualiz|ajustar)/.test(lower)?'MODIFICACION':/(consulta|confirmad|quién va|quien va|a qué hora)/.test(lower)?'CONSULTA':'NUEVA_RESERVA'; 
+let date = '';
+
+const normalizedText = lower
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
+const months = {
+  enero: 1, ene: 1,
+  febrero: 2, feb: 2,
+  marzo: 3, mar: 3,
+  abril: 4, abr: 4,
+  mayo: 5, may: 5,
+  junio: 6, jun: 6,
+  julio: 7, jul: 7,
+  agosto: 8, ago: 8,
+  septiembre: 9, sep: 9, sept: 9,
+  octubre: 10, oct: 10,
+  noviembre: 11, nov: 11,
+  diciembre: 12, dic: 12
+};
+
+const isoMatch = normalizedText.match(
+  /\b(20\d{2})-(\d{2})-(\d{2})\b/
+);
+
+const numericMatch = normalizedText.match(
+  /\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/
+);
+
+const textDateMatch = normalizedText.match(
+  /\b(\d{1,2})\s*(?:de\s*)?(enero|ene|febrero|feb|marzo|mar|abril|abr|mayo|may|junio|jun|julio|jul|agosto|ago|septiembre|sept|sep|octubre|oct|noviembre|nov|diciembre|dic)(?:\s+de?\s*(20\d{2}))?\b/
+);
+
+if (isoMatch) {
+  date = isoMatch[0];
+
+} else if (numericMatch) {
+  const day = Number(numericMatch[1]);
+  const month = Number(numericMatch[2]);
+  const year = numericMatch[3]
+    ? Number(numericMatch[3].length === 2
+        ? '20' + numericMatch[3]
+        : numericMatch[3])
+    : new Date().getFullYear();
+
+  date = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+} else if (textDateMatch) {
+  const day = Number(textDateMatch[1]);
+  const month = months[textDateMatch[2]];
+  const year = Number(textDateMatch[3]) || new Date().getFullYear();
+
+  date = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
+if (date && !validDate(date)) {
+  date = '';
+}
+
+if (!date && /pasado mañana/.test(lower)) {
+  const d = new Date(TODAY + 'T00:00:00');
+  d.setDate(d.getDate() + 2);
+  date = iso(d);
+
+} else if (!date && /mañana/.test(lower)) {
+  const d = new Date(TODAY + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  date = iso(d);
+
+} else if (!date && /hoy/.test(lower)) {
+  date = TODAY;
+}
+
 let duration='';let durM=txt.match(/(\d{1,4})\s*(?:minutos|min|hrs?|horas?)/i);if(durM){const n=Number(durM[1]);duration=/hora|hr/i.test(durM[0])?n*60:n}let passengers='';let pm=txt.match(/(\d+)\s*(personas|pasajeros|pasajero|clientes)/i);if(pm)passengers=pm[1];let driver=state.drivers.find(d=>lower.includes(d.toLowerCase()))||'';let vehicle=state.vehicles.find(v=>lower.includes(v.name.toLowerCase()))?.name||'';let pickup='';let p=txt.match(/(?:recoger|recogida|recogemos)\s+(?:(?:\d+)\s+(?:pasajeros|personas)\s+)?(?:en\s+)?([^,.;]+)/i)||txt.match(/desde\s+([^,.;]+)/i);if(p)pickup=p[1].replace(/[.,]$/,'').trim();let dest='';let destM=txt.match(/(?:destino|hacia|hasta)\s+(.+?)(?=\s+(?:con|a las|el día|para|$))/i);if(destM)dest=destM[1].replace(/[.,]$/,'').trim();let service=/boda|wedding/.test(lower)?'Traslado de boda':/tour|turístic/.test(lower)?'Tour turístico':/corporativ|empresa/.test(lower)?'Traslado corporativo':/evento/.test(lower)?'Traslado de evento':'';let missing=[];if(!date)missing.push('fecha');if(!time)missing.push('hora');if(!pickup)missing.push('punto de recogida');if(!passengers)missing.push('número de pasajeros');analysisDraft={operation,date,time,durationMinutes:duration,passengers,pickup,destination:dest,type:service,driver,vehicle,customer:'',missing};$('analysisEmpty').style.display='none';$('analysisForm').style.display='block';$('operationBadge').textContent=operation.replaceAll('_',' ');$('confidenceBadge').textContent='Extracción de muestra · reglas locales';$('aiDate').value=date;$('aiTime').value=time;$('aiDuration').value=duration;$('aiType').value=service;$('aiPassengers').value=passengers;$('aiPickup').value=pickup;$('aiDestination').value=dest;$('aiCustomer').value='';renderSelects();$('aiDriver').value=driver;$('aiVehicle').value=vehicle;const targetWrap=$('targetReservationWrap');const needsTarget=operation==='MODIFICACION'||operation==='CANCELACION'||operation==='CONSULTA';targetWrap.style.display=needsTarget?'block':'none';const available=state.reservations.filter(r=>r.status!=='CANCELADA');$('aiTargetReservation').innerHTML='<option value="">Selecciona la reserva</option>'+available.map(r=>`<option value="${escapeHTML(r.id)}">${escapeHTML(r.id)} · ${fmtDate(r.date)} · ${escapeHTML(r.time)} · ${escapeHTML(r.customer||r.type||'Servicio')}</option>`).join('');const ref=txt.match(/RSM-[A-Z0-9-]+/i);if(ref&&available.some(r=>r.id.toLowerCase()===ref[0].toLowerCase()))$('aiTargetReservation').value=available.find(r=>r.id.toLowerCase()===ref[0].toLowerCase()).id;$('aiSaveBtn').textContent=operation==='CANCELACION'?'Registrar cancelación':operation==='MODIFICACION'?'Aplicar modificación':operation==='CONSULTA'?'Consultar reserva':'Guardar como pendiente de revisión';$('aiWarnings').style.display=(missing.length||needsTarget)?'block':'none';$('aiWarnings').textContent=(missing.length?'Información faltante para revisar: '+missing.join(', ')+'. ':'')+(needsTarget?'Selecciona la reserva existente correcta. No se modificará ni cancelará ningún registro sin esa selección.':'Revisa la información extraída y confirma que coincida con el mensaje original.');toast('Análisis demostrativo completado')}
 function clearAnalysis(){$('analysisForm').style.display='none';$('analysisEmpty').style.display='block';analysisDraft=null}
 function saveAnalyzedReservation(){const operation=$('operationBadge').textContent.trim().replaceAll(' ','_');const targetId=$('aiTargetReservation').value;const target=state.reservations.find(r=>r.id===targetId);if(operation==='CONSULTA'){if(!target){toast('Selecciona la reserva que deseas consultar.');return}viewReservation(target.id);return}if(operation==='CANCELACION'){if(!target){toast('Selecciona la reserva que deseas cancelar.');return}if(!confirm('¿Registrar la cancelación de '+target.id+'?'))return;target.status='CANCELADA';logEvent('CANCELACIÓN',target.id,'Cancelación registrada desde el procesador demostrativo.');persist();renderAll();clearAnalysis();toast('Cancelación registrada');navigate('calendar');selectDay(target.date);return}const data={date:$('aiDate').value,time:$('aiTime').value,durationMinutes:Number($('aiDuration').value)||60,type:$('aiType').value.trim(),passengers:$('aiPassengers').value?Number($('aiPassengers').value):'',pickup:$('aiPickup').value.trim(),destination:$('aiDestination').value.trim(),driver:$('aiDriver').value,vehicle:$('aiVehicle').value,customer:$('aiCustomer').value.trim(),status:'PENDIENTE'};if(operation==='MODIFICACION'){if(!target){toast('Selecciona la reserva que deseas modificar.');return}const fields=['date','time','durationMinutes','type','passengers','pickup','destination','driver','vehicle','customer'];const changed=fields.filter(k=>k==='durationMinutes' ? $('aiDuration').value.trim()!=='' : (data[k]!==''&&data[k]!==null&&data[k]!==undefined));if(!changed.length){toast('No se identificaron cambios. Completa al menos un campo.');return}const updated={...target};changed.forEach(k=>{if(k==='durationMinutes'){updated[k]=Number($('aiDuration').value)}else updated[k]=data[k]});if(!validDate(updated.date)||!validTime(updated.time)){toast('La reserva debe conservar una fecha y hora válidas.');return}const selectedVehicle=state.vehicles.find(v=>v.name===updated.vehicle);if(selectedVehicle&&updated.passengers&&Number(updated.passengers)>Number(selectedVehicle.capacity||0)){toast('El vehículo no tiene capacidad suficiente para los pasajeros indicados.');return}const conflicts=findConflicts(updated,target.id);if(conflicts.length&&!confirm('La modificación genera un posible conflicto de disponibilidad. ¿Aplicar de todos modos como pendiente de revisión?'))return;Object.assign(target,updated,{status:'PENDIENTE'});logEvent('MODIFICACIÓN',target.id,'Cambios parciales aplicados desde el procesador demostrativo; pendiente de confirmación.');persist();renderAll();clearAnalysis();toast('Modificación aplicada como pendiente de revisión');navigate('calendar');selectDay(target.date);return}if(!data.date||!data.time){toast('Para crear una reserva nueva se requieren fecha y hora.');return}if(!validDate(data.date)||!validTime(data.time)){toast('Revisa el formato de fecha y hora.');return}const selectedVehicle=state.vehicles.find(v=>v.name===data.vehicle);if(selectedVehicle&&Number(selectedVehicle.capacity)>0&&data.passengers&&Number(data.passengers)>Number(selectedVehicle.capacity)){toast('El vehículo seleccionado no tiene capacidad suficiente para ese número de pasajeros.');return}const conflicts=findConflicts(data);if(conflicts.length&&!confirm('Se detectó un posible cruce de horario. ¿Guardar como pendiente para revisión?'))return;const id='RSM-'+Date.now().toString().slice(-8);state.reservations.push({id,...data});logEvent('CREACIÓN',id,'Reserva creada desde el procesador demostrativo; pendiente de revisión.');persist();renderAll();clearAnalysis();toast('Reserva creada como pendiente');navigate('calendar');selectDay(data.date)}
